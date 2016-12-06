@@ -12,41 +12,48 @@
 
 using namespace std;
 
+
+class object{
+public:
+    virtual bool getChanged(){return false;};
+    virtual void update(object*){};
+};
+
 class observer;
 
-///////////抽象基类
-class observable{
+class observable: public object{
 private:                    //protected?
-    list<observer*> list_obs;                       //observer链表
+    list<object*> list_obs;                       //object链表
     bool changed;                                  //保存observerble的状态
 public:
     observable(): changed(false) {}
     
     void notify();                                 //通知
-    void addobs(observer*);                         //添加观察者
-    void deleteobs(observer*);                      //删除观察者
+    void addobs(object*);                         //添加观察者
+    void deleteobs(object*);                      //删除观察者
+    void update(object* o);                         //更新object链表
     
-    virtual void setChanged(bool);                     //设置状态
-    virtual bool getChanged();                     //得到状态
+    void setChanged(bool);                     //设置状态
+    bool getChanged();                     //得到状态
 };
 
 
 
-class observer{
-//private:
+class observer: public object{
 public:
     observer(){}
-    virtual void update(observable*);
+    void update(object*);
     
 };
 
+////////////
 
-void observable::addobs(observer* o){
+void observable::addobs(object* o){
     list_obs.push_back(o);
 }
 
-void observable::deleteobs(observer* o){                           //再看
-    list<observer*>::iterator iter;
+void observable::deleteobs(object* o){                           //再看
+    list<object*>::iterator iter;
     iter = find(list_obs.begin(), list_obs.end(), o);
     if (list_obs.end() != iter)
     {
@@ -55,8 +62,8 @@ void observable::deleteobs(observer* o){                           //再看
 }
 
 void observable::notify(){
-    list<observer*>::iterator iter1;
-    list<observer*>::iterator iter2;
+    list<object*>::iterator iter1;
+    list<object*>::iterator iter2;
     for (iter1 = list_obs.begin(), iter2 = list_obs.end(); iter1 != iter2; ++iter1)
     {
         (*iter1)->update(this);
@@ -71,16 +78,45 @@ bool observable::getChanged(){
     return changed;
 }
 
+void observable::update(object* o){
+    this->setChanged(o->getChanged());
+    this->notify();
+}
 
-void observer::update(observable* o){
+
+void observer::update(object* o){
     if(o == NULL)                        //自己写判断函数
         return;
+    bool b;
+    b = o->getChanged();
+    if(b == true)
+        cout << "true\n" << endl;
+    else
+        cout << "false\n" << endl;
     
 }
 //////////////////////////////////////////////////////////////
 
 
 int main(int argc, const char * argv[]) {
-    cout << "helloworld" << endl;
+    observer* o1 = new observer();
+    observer* o2 = new observer();
+    observable* o3 = new observable();
+    observer* o4 = new observer();
+    
+    o3->addobs(o4);
+    
+    observable* o = new observable();
+    o->addobs(o1);
+    o->addobs(o2);
+    o->addobs(o3);
+    o->setChanged(true);
+    o->notify();
+    
+    o->deleteobs(o1);
+    o->setChanged(false);
+    o->notify();
+    
+    system("pause");
     return 0;
 }
