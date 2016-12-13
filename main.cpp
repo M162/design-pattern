@@ -1,272 +1,224 @@
 //
 //  main.cpp
-//  design pattern-undo redo
+//  design patten-observer
 //
-//  Created by 程之远 on 2016/12/6.
+//  Created by 程之远 on 2016/11/20.
 //  Copyright © 2016年 程之远. All rights reserved.
 //
 
 #include <iostream>
-#include <string>
 #include <list>
-
-#include "UndoableEdit.h"
-#include "AbstractUndoableEdit.h"
-#include "UndoableEditListenerAndEvent.h"
-#include "CompoundEdit.h"
+#include <algorithm>
+#include <string>
 
 using namespace std;
 
 
-////////////////////////////////////////////////////////////////////////////
-//UndoManager
-////////////////////////////////////////////////////////////////////////////
-
-class UndoManager : public CompoundEdit, public UndoableEditListener{
-private:
-    int indexOfNextAdd;
-//    int limit;           //限制不要了
+class object{
 public:
-    UndoManager(): indexOfNextAdd(0){}
-    void undo();
-    bool canUndo();
-    void redo();
-    bool canRedo();
-    void die(){};
-    void addEdit(UndoableEdit* anEdit);
-    void UndoableEditHappened(UndoableEditEvent* uee);
-protected:
-    void trimEdits(int from);
+    virtual bool getChanged(){return false;};
+    virtual void update(object*){};
 };
 
-void UndoManager::undo(){
-    if(canUndo() == false) return;
-    list<UndoableEdit*>::iterator ite = edits.begin();
-    for(int i = 1; i != indexOfNextAdd; i++){              //ite移到indexOfNextAdd
-        ite++;
-    }
-    (*ite)->undo();
-    indexOfNextAdd--;
-}
+class observer;
 
-bool UndoManager::canUndo(){
-    if(indexOfNextAdd == 0)
-        return false;
-    else
-        return true;
-}
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
-void UndoManager::redo(){
-    if(canRedo() == false) return;
-    list<UndoableEdit*>::iterator ite = edits.begin();
-    for(int i = 0; i != indexOfNextAdd; i++){              //ite移到indexOfNextAdd的后面一个
-        ite++;
-    }
-    (*ite)->redo();
-    indexOfNextAdd++;
-}
-
-bool UndoManager::canRedo(){
-    if(indexOfNextAdd == edits.size())
-        return false;
-    else
-        return true;
-}
-
-void UndoManager::addEdit(UndoableEdit* anEdit){
-    trimEdits(indexOfNextAdd);
-    edits.push_back(anEdit);
-}
-
-void UndoManager::UndoableEditHappened(UndoableEditEvent* uee){
-    addEdit(uee->getEdit());
-    indexOfNextAdd++;
-}
-
-void UndoManager::trimEdits(int from){
-    list<UndoableEdit*>::iterator ite = edits.begin();
-    for(int i = 0; i != from; i++){              //ite移到indexOfNextAdd的后面一个
-        ite++;
-    }
-    while(ite != edits.end()){
-        ite = edits.erase(ite);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////
-//UndoableEditSupport
-////////////////////////////////////////////////////////////////////////////
-
-class UndoableEditSupport{
-protected:
-    int updateLevel;
-    CompoundEdit* compoundEdit = new CompoundEdit();
-    list<UndoableEditListener*> listeners;
+class observable: public object{
+private:                    //protected?
+    list<object*> list_obs;                       //object链表
+    bool changed;                                  //保存observerble的状态
+    string name;
+public:
+    observable(string s): changed(false), name(s){}
     
-//    void _postEdit(UndoableEdit e);                //意义何在？
-    CompoundEdit* createCompoundEdit();
-public:
-    UndoableEditSupport(){};
-    void addUndoableEditListener(UndoableEditListener* i);
-    void removeUndoableEditListener(UndoableEditListener* i);
-    UndoableEditListener getUndoableEditListeners();
-    void postEdit(UndoableEdit* e);
-    int getUpdateLevel();
-    void beginUpdate();
-    void endUpdate();
-    string toString();
+    string getName(){return name;}
+    
+    void notify();                                 //通知
+    void addobs(object*);                         //添加观察者
+    void deleteobs(object*);                      //删除观察者
+    void update(object* o);                         //更新object链表
+    
+    void setChanged(bool);                     //设置状态
+    bool getChanged();                     //得到状态
 };
 
-void UndoableEditSupport::postEdit(UndoableEdit* e){
-    UndoableEditEvent* uee = new UndoableEditEvent(e);
-    list<UndoableEditListener*>::iterator ite = listeners.begin();
-    for(; ite != listeners.end(); ite++){
-        (*ite)->UndoableEditHappened(uee);
+void observable::addobs(object* o){
+    list_obs.push_back(o);
+}
+
+void observable::deleteobs(object* o){                           //再看
+    list<object*>::iterator iter;
+    iter = find(list_obs.begin(), list_obs.end(), o);
+    if (list_obs.end() != iter)
+    {
+        list_obs.erase(iter);
     }
 }
 
-void UndoableEditSupport::addUndoableEditListener(UndoableEditListener* i){
-    listeners.push_back(i);
-}
-
-
-////////////////////////////////////////////////////////////////////////////
-//MyEdit
-////////////////////////////////////////////////////////////////////////////
-
-class MyEdit{
-protected:
-    UndoableEditSupport* ues = new UndoableEditSupport();
-    list<string> s;
-public:
-    MyEdit(){}
-    void setStrList(list<string> ss);
-    list<string> getStrList();
-    UndoableEditSupport* getUES();
-    void addUndoableEditListener(UndoableEditListener* uel);
-    void outstr();
-};
-
-void MyEdit::setStrList(list<string> ss){
-    s = ss;
-}
-
-list<string> MyEdit::getStrList(){
-    return s;
-}
-
-UndoableEditSupport* MyEdit::getUES(){
-    return ues;
-}
-
-void MyEdit::addUndoableEditListener(UndoableEditListener* uel){
-    ues->addUndoableEditListener(uel);
-}
-
-void MyEdit::outstr(){
-    list<string>::iterator ite = s.begin();
-    for(; ite != s.end(); ite++){
-        cout << *ite << " ";
+void observable::notify(){
+    list<object*>::iterator iter1;
+    list<object*>::iterator iter2;
+    for (iter1 = list_obs.begin(), iter2 = list_obs.end(); iter1 != iter2; ++iter1)
+    {
+        (*iter1)->update(this);
     }
 }
 
-////////////////////////////////////////////////////////////////////////////
-//myUndoableEdit
-////////////////////////////////////////////////////////////////////////////
+void observable::setChanged(bool b){
+    changed = b;
+}
 
+bool observable::getChanged(){
+    return changed;
+}
 
-class myUndoableEdit: public AbstractUndoableEdit{
+void observable::update(object* o){
+    this->setChanged(o->getChanged());
+    this->notify();
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+class observer: public object{
 private:
-    MyEdit* myEdit;
-    list<string> str;                       //记录操作后的最新状况
+    string name;
 public:
-    myUndoableEdit(MyEdit* me);
-    void undo();
-    void redo();
-
+    string getName(){return name;}
+    
+    observer(string s): name(s){}
+    void update(object*);
+    
 };
 
-myUndoableEdit::myUndoableEdit(MyEdit* me){
-    myEdit = me;
-    str = me->getStrList();
+void observer::update(object* o){
+    if(o == NULL)
+        return;
+    bool b;
+    b = o->getChanged();
+    if(b == true)
+        cout << name << ": true\n";
+    else
+        cout << name << ": false\n";
 }
 
-void myUndoableEdit::undo(){
-    AbstractUndoableEdit::undo();
-    list<string> s = str;
-    list<string>::iterator ite = s.end();                //删除最后一个字符串
-    ite--;
-    s.erase(ite);
-    myEdit->setStrList(s);
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+observable* getObservable(list<observable*> observableList, string name){
+    list<observable*>::iterator ite = observableList.begin();
+    for(; ite != observableList.end(); ite++){
+        if(!(((*ite)->getName()).compare(name)))
+            return *ite;
+    }
+    return NULL;
 }
 
-void myUndoableEdit::redo(){
-    AbstractUndoableEdit::redo();
-    myEdit->setStrList(str);
+observer* getObserver(list<observer*> observerList, string name){
+    list<observer*>::iterator ite = observerList.begin();
+    for(; ite != observerList.end(); ite++){
+        if(!(((*ite)->getName()).compare(name)))
+            return *ite;
+    }
+    return NULL;
 }
 
-
-////////////////////////////////////////////////////////////////////////////
-
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
 
 int main(int argc, const char * argv[]) {
     cout << "*********************************************\n"
-         << "********    1.input(end with '$')   *********\n"
-         << "********    2.undo                  *********\n"
-         << "********    3.redo                  *********\n"
-         << "********    4.quit                  *********\n"
+         << "********    1.establish observable  *********\n"
+         << "********    2.establish observer    *********\n"
+         << "********    3.add                   *********\n"
+         << "********    4.notify_true           *********\n"
+         << "********    5.notify_false          *********\n"
+         << "********    6.quit                  *********\n"
          << "*********************************************\n"
          <<endl;
-    MyEdit* myEdit = new MyEdit();
-    UndoManager* manager = new UndoManager();
-    myEdit->addUndoableEditListener(manager);
-    list<string> s;              //文本，undo、redo的主要对象，存到myEdit里
-    string str;                  //暂存文本中的字符串
-    int func = 0;                 //功能号
     
-    while(func != 4){
+    list<observer*> observerList;
+    list<observable*> observableList;
+    
+    observable* oa;
+    observer* o;
+    observable* o2;
+    
+    int func = 0;
+    string name;
+    
+    while(func != 6){
         cout << "请输入功能号：";
         cin >> func;
         switch (func) {
             case 1:{
-                cout << "请输入文本：" <<endl;
-                myEdit->outstr();
-                while(true){
-                    cin >> str;
-                    if(str[str.length()-1] == '$'){
-                        if(str.length() > 1){                 //如果字符串以‘$’结尾，则去掉‘$’，加到字符串数组中
-                            str.erase(str.length()-1);
-                            s.push_back(str);
-                            myEdit->setStrList(s);
-                            myUndoableEdit* mue = new myUndoableEdit(myEdit);
-                            myEdit->getUES()->postEdit(mue);
-                        }
-                        break;       //输入‘$’表示文本输入结束
-                    }
-                    s.push_back(str);
-                    myEdit->setStrList(s);
-                    myUndoableEdit* mue = new myUndoableEdit(myEdit);
-                    myEdit->getUES()->postEdit(mue);
-                }
+                cout << "请输入名称：";
+                cin >> name;
+                observable* o = new observable(name);
+                observableList.push_back(o);
             }break;
             case 2:{
-                manager->undo();
-                s = myEdit->getStrList();
-                myEdit->outstr();
-                cout << endl;
+                cout << "请输入名称：";
+                cin >> name;
+                observer* o = new observer(name);
+                observerList.push_back(o);
             }break;
             case 3:{
-                manager->redo();
-                s = myEdit->getStrList();
-                myEdit->outstr();
-                cout << endl;
+                cout << "请输入被观察者的名称：";
+                cin >> name;
+                oa = getObservable(observableList, name);
+                if(oa == NULL){
+                    cout << "未找到名为"  << name << "的被观察者" <<endl;
+                    break;
+                } 
+                cout << "请输入观察者的名称：";
+                cin >> name;
+                o = getObserver(observerList, name);
+                if(o == NULL){
+                    o2 = getObservable(observableList, name);
+                    if(o2 == NULL){
+                    cout << "未找到名为"  << name << "的观察者" <<endl;
+                    break;
+                    }
+                    else
+                        oa->addobs(o2);
+                }
+                else
+                    oa->addobs(o);
             }break;
-            case 4:
+            case 4:{
+                cout << "请输入被观察者名称：";
+                cin >> name;
+                oa = getObservable(observableList, name);
+                if(oa == NULL){
+                    cout << "未找到名为"  << name << "的被观察者" <<endl;
+                    break;
+                }
+                else{
+                    oa->setChanged(true);
+                    oa->notify();
+                }
+            }break;
+            case 5:{
+                cout << "请输入被观察者名称：";
+                cin >> name;
+                oa = getObservable(observableList, name);
+                if(oa == NULL){
+                    cout << "未找到名为"  << name << "的被观察者" <<endl;
+                    break;
+                }
+                else{
+                    oa->setChanged(false);
+                    oa->notify();
+                }
+            }break;
+            case 6:
                 break;
             default:
                 break;
         }
     }
-    
     return 0;
 }
